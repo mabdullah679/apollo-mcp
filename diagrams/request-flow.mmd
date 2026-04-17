@@ -1,0 +1,16 @@
+sequenceDiagram
+    autonumber
+    participant C as MCP Client
+    participant M as Apollo MCP Server
+    participant O as Operation Files
+    participant G as GraphQL API
+
+    C->>M: Connect to http://localhost:8000/mcp
+    M->>O: Load approved .graphql operations
+    O-->>M: GetBooks / GetBookById / GetBooksByGenre
+    M-->>C: Advertise MCP tools
+    C->>M: Invoke tool with arguments
+    M->>M: Convert tool call to GraphQL operation
+    M->>G: Send GraphQL request to http://api:4001/
+    G-->>M: Return GraphQL JSON data
+    M-->>C: Return MCP-formatted tool result

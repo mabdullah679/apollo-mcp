@@ -1,0 +1,19 @@
+flowchart LR
+    subgraph LocalMachine["Local machine"]
+        Client["MCP client\nInspector / Codex / Cursor"]
+
+        subgraph Docker["docker compose"]
+            MCP["Apollo MCP Server\n:8000/mcp"]
+            API["Apollo GraphQL API\n:4001"]
+        end
+
+        Ops["graphql/operations/*.graphql\nApproved operations"]
+        Schema["graphql/api.graphql\nSchema snapshot"]
+    end
+
+    Client -->|"MCP over Streamable HTTP"| MCP
+    Ops -->|"tool definitions"| MCP
+    Schema -->|"schema metadata"| MCP
+    MCP -->|"GraphQL queries/mutations"| API
+    API -->|"GraphQL JSON response"| MCP
+    MCP -->|"MCP tool results"| Client

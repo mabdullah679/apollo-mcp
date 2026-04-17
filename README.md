@@ -13,6 +13,30 @@ This version uses the standalone Apollo MCP Server container instead of the `rov
 - `api`: a tiny Apollo Server on `http://localhost:4001/`
 - `mcp`: Apollo MCP Server on `http://localhost:8000/mcp`
 
+## Architecture Diagram
+
+```mermaid
+flowchart LR
+    subgraph LocalMachine["Local machine"]
+        Client["MCP client\nInspector / Codex / Cursor"]
+
+        subgraph Docker["docker compose"]
+            MCP["Apollo MCP Server\n:8000/mcp"]
+            API["Apollo GraphQL API\n:4001"]
+        end
+
+        Ops["graphql/operations/*.graphql\nApproved operations"]
+        Schema["graphql/api.graphql\nSchema snapshot"]
+    end
+
+    Client -->|"MCP over Streamable HTTP"| MCP
+    Ops -->|"tool definitions"| MCP
+    Schema -->|"schema metadata"| MCP
+    MCP -->|"GraphQL queries/mutations"| API
+    API -->|"GraphQL JSON response"| MCP
+    MCP -->|"MCP tool results"| Client
+```
+
 ## Run it
 
 ```powershell
@@ -81,6 +105,27 @@ The request flow is:
 5. Apollo MCP Server sends that GraphQL request to `http://api:4001/`.
 6. The GraphQL API executes the query and returns data.
 7. Apollo MCP Server returns the result to the MCP client in MCP format.
+
+## Request Flow Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as MCP Client
+    participant M as Apollo MCP Server
+    participant O as Operation Files
+    participant G as GraphQL API
+
+    C->>M: Connect to http://localhost:8000/mcp
+    M->>O: Load approved .graphql operations
+    O-->>M: GetBooks / GetBookById / GetBooksByGenre
+    M-->>C: Advertise MCP tools
+    C->>M: Invoke tool with arguments
+    M->>M: Convert tool call to GraphQL operation
+    M->>G: Send GraphQL request to http://api:4001/
+    G-->>M: Return GraphQL JSON data
+    M-->>C: Return MCP-formatted tool result
+```
 
 ## Why there is no router here
 
