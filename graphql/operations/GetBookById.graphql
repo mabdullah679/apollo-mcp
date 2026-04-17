@@ -1,0 +1,10 @@
+# Looks up one book by its identifier.
+query GetBookById($id: ID!) {
+  bookById(id: $id) {
+    id
+    title
+    author
+    genre
+    inStock
+  }
+}

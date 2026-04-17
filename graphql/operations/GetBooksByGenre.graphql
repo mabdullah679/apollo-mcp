@@ -1,0 +1,10 @@
+# Filters the demo catalog by genre.
+query GetBooksByGenre($genre: String!) {
+  booksByGenre(genre: $genre) {
+    id
+    title
+    author
+    genre
+    inStock
+  }
+}

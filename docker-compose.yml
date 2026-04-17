@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "4001:4001"
+
+  mcp:
+    image: ghcr.io/apollographql/apollo-mcp-server:latest
+    depends_on:
+      - api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mcp-config.yaml:/config.yaml:ro
+      - ./graphql:/data:ro
+    command: ["/config.yaml"]

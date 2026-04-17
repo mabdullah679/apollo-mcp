@@ -1,0 +1,19 @@
+endpoint: http://api:4001/
+operations:
+  source: local
+  paths:
+    - /data/operations
+schema:
+  source: local
+  path: /data/api.graphql
+introspection:
+  introspect:
+    enabled: true
+transport:
+  type: streamable_http
+  address: 0.0.0.0
+  port: 8000
+  stateful_mode: false
+server_info:
+  title: "Apollo MCP Demo"
+  description: "Standalone Apollo MCP Server exposing selected local GraphQL operations."

@@ -1,0 +1,10 @@
+# Returns every book in the demo catalog.
+query GetBooks {
+  books {
+    id
+    title
+    author
+    genre
+    inStock
+  }
+}
