@@ -7,7 +7,7 @@
     "start:api": "node src/server.mjs",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@apollo/server": "^5.2.0",
