@@ -1,145 +1,68 @@
 # Apollo MCP Demo
 
-This folder sets up the same core architecture Apollo demonstrates for MCP:
+A local demo that puts the standalone Apollo MCP Server in front of a small GraphQL API, so an AI client can call three approved GraphQL operations as MCP tools.
 
-1. a normal GraphQL API,
-2. an Apollo MCP Server in front of it,
-3. a small allowlist of GraphQL operations that become MCP tools.
+Spec/requirements doc: none in this repo. Upstream docs: [Apollo MCP Server](https://www.apollographql.com/docs/apollo-mcp-server/quickstart).
 
-This version uses the standalone Apollo MCP Server container instead of the `rover init --mcp` wizard because it is simpler to run locally without GraphOS credentials.
-
-## What gets started
-
-- `api`: a tiny Apollo Server on `http://localhost:4001/`
-- `mcp`: Apollo MCP Server on `http://localhost:8000/mcp`
-
-## Architecture Diagram
-
-```mermaid
-flowchart LR
-    subgraph LocalMachine["Local machine"]
-        Client["MCP client\nInspector / Codex / Cursor"]
-
-        subgraph Docker["docker compose"]
-            MCP["Apollo MCP Server\n:8000/mcp"]
-            API["Apollo GraphQL API\n:4001"]
-        end
-
-        Ops["graphql/operations/*.graphql\nApproved operations"]
-        Schema["graphql/api.graphql\nSchema snapshot"]
-    end
-
-    Client -->|"MCP over Streamable HTTP"| MCP
-    Ops -->|"tool definitions"| MCP
-    Schema -->|"schema metadata"| MCP
-    MCP -->|"GraphQL queries/mutations"| API
-    API -->|"GraphQL JSON response"| MCP
-    MCP -->|"MCP tool results"| Client
+```text
+MCP client --MCP/HTTP--> mcp (Apollo MCP Server :8000/mcp) --GraphQL--> api (Apollo Server :4001)
+                              ^ tools built from graphql/operations/*.graphql + graphql/api.graphql
 ```
+
+Not local or contained: the MCP client (Inspector, Cursor, etc.) you bring, and the `ghcr.io/apollographql/apollo-mcp-server` image, pulled from GitHub's registry on first run. No GraphOS account or credentials are needed.
+
+## Prerequisites
+- Docker with Compose v2, ports 4001 and 8000 free on 127.0.0.1.
+- Node 22 only for `npm test` and the optional Inspector. Not needed to run the stack.
 
 ## Run it
+1. `docker compose up --build -d`
+2. `npm ci && npm test` (checks the live stack, see Tests).
+3. Inspect: `npx @modelcontextprotocol/inspector`, transport `Streamable HTTP`, URL `http://127.0.0.1:8000/mcp`, Connect, List Tools.
+4. Stop: `docker compose down`.
 
-```powershell
-cd C:\Users\muham\Documents\apollo-mcp
-npm install
-docker compose up --build
-```
+Ports taken: edit the left side of the `ports:` entries in [docker-compose.yml](docker-compose.yml) and set `MCP_URL` / `API_URL` when running `npm test`.
 
-In a second terminal, inspect the MCP server:
-
-```powershell
-npx @modelcontextprotocol/inspector
-```
-
-Then open the Inspector URL it prints, choose:
-
-- Transport Type: `Streamable HTTP`
-- URL: `http://127.0.0.1:8000/mcp`
-
-Click `Connect`, then `List Tools`.
-
-You should see MCP tools derived from:
-
-- `GetBooks`
-- `GetBookById`
-- `GetBooksByGenre`
-
-## Optional client config
-
-For MCP clients that use `mcp-remote`, the local config shape is:
+Optional client config for `mcp-remote` clients:
 
 ```json
-{
-  "mcpServers": {
-    "apollo-demo": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "http://127.0.0.1:8000/mcp"
-      ]
-    }
-  }
-}
+{ "mcpServers": { "apollo-demo": { "command": "npx", "args": ["mcp-remote", "http://127.0.0.1:8000/mcp"] } } }
 ```
 
-## What's actually happening
+## What it does
+| Action | Result |
+|---|---|
+| List tools | `GetBooks`, `GetBookById`, `GetBooksByGenre`, plus `introspect` (see decisions) |
+| Call `GetBookById` with `id: "3"` | Returns "Kindred" from the 4-book in-memory catalog |
+| Call a tool with GraphQL syntax in an argument | Treated as a plain value; returns no match |
+| Call a tool that is not configured (e.g. `execute`) | JSON-RPC "Tool not found" |
 
-The GraphQL API is still the real data service. It knows the schema, resolves fields, and returns JSON for GraphQL queries.
+## Interface
+| Endpoint | Method | Auth |
+|---|---|---|
+| `http://127.0.0.1:8000/mcp` | MCP Streamable HTTP (POST) | none |
+| `http://127.0.0.1:4001/` | GraphQL (POST), read-only `Query` type | none |
 
-Apollo MCP Server does not replace that API. It sits in front of it and translates approved GraphQL operations into MCP tools that an AI client can discover and call.
+Both are bound to loopback only in [docker-compose.yml](docker-compose.yml). There is no authentication: do not expose these ports beyond the local machine.
 
-The important files are:
+## Tests
+`npm test` runs [test/stack.test.mjs](test/stack.test.mjs) (6 tests, Node's built-in runner) against the already-running compose stack, so it needs Docker and the image pull. It covers: API data, the exact tool list, a correct tool call, argument injection treated as data, an unconfigured tool being rejected, and the MCP port not being reachable on a LAN interface. There is no UI, so no browser tests exist. It does not cover MCP authentication (none exists) or load.
 
-- [mcp-config.yaml](C:/Users/muham/Documents/apollo-mcp/mcp-config.yaml): tells Apollo MCP Server where the GraphQL endpoint lives, where the schema file is, where the allowed operations live, and how to expose MCP over HTTP.
-- [graphql/api.graphql](C:/Users/muham/Documents/apollo-mcp/graphql/api.graphql): schema snapshot used by Apollo MCP Server so it can describe tools correctly.
-- [graphql/operations/GetBooks.graphql](C:/Users/muham/Documents/apollo-mcp/graphql/operations/GetBooks.graphql): one approved query that becomes one MCP tool.
-- [src/server.mjs](C:/Users/muham/Documents/apollo-mcp/src/server.mjs): the actual GraphQL API implementation.
-- [docker-compose.yml](C:/Users/muham/Documents/apollo-mcp/docker-compose.yml): runs both services together on one local network.
+## Layout
+| Path | Role |
+|---|---|
+| [src/server.mjs](src/server.mjs) | The GraphQL API (4 hard-coded books) |
+| [graphql/operations](graphql/operations) | The approved operations that become MCP tools |
+| [graphql/api.graphql](graphql/api.graphql) | Schema snapshot the MCP server reads |
+| [mcp-config.yaml](mcp-config.yaml) | MCP server config: endpoint, schema, operations, transport |
+| [docker-compose.yml](docker-compose.yml) | Runs `api` and `mcp` together |
+| [Dockerfile.api](Dockerfile.api) | API image (runs as non-root `node`) |
+| [diagrams](diagrams) | Mermaid sources: [architecture](diagrams/architecture.mmd), [request flow](diagrams/request-flow.mmd) |
+| [test/stack.test.mjs](test/stack.test.mjs) | Stack tests |
+| [CLAUDE.md](CLAUDE.md) | Notes for AI sessions |
 
-The request flow is:
-
-1. Your MCP client connects to `http://localhost:8000/mcp`.
-2. Apollo MCP Server advertises tools based on the `.graphql` operation files.
-3. The client calls one of those tools with arguments.
-4. Apollo MCP Server converts that tool call back into the underlying GraphQL operation.
-5. Apollo MCP Server sends that GraphQL request to `http://api:4001/`.
-6. The GraphQL API executes the query and returns data.
-7. Apollo MCP Server returns the result to the MCP client in MCP format.
-
-## Request Flow Diagram
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as MCP Client
-    participant M as Apollo MCP Server
-    participant O as Operation Files
-    participant G as GraphQL API
-
-    C->>M: Connect to http://localhost:8000/mcp
-    M->>O: Load approved .graphql operations
-    O-->>M: GetBooks / GetBookById / GetBooksByGenre
-    M-->>C: Advertise MCP tools
-    C->>M: Invoke tool with arguments
-    M->>M: Convert tool call to GraphQL operation
-    M->>G: Send GraphQL request to http://api:4001/
-    G-->>M: Return GraphQL JSON data
-    M-->>C: Return MCP-formatted tool result
-```
-
-## Why there is no router here
-
-Apollo Router is useful when:
-
-- you are serving a federated supergraph,
-- you want Apollo's GraphOS-managed runtime,
-- or you want GraphQL and MCP bundled in Apollo Runtime.
-
-For a simple local demo with one existing GraphQL API, Apollo's own deployment docs support using the standalone Apollo MCP Server container directly against that endpoint. That is what this project uses.
-
-## Sources
-
-- Apollo MCP Server quickstart: https://www.apollographql.com/docs/apollo-mcp-server/quickstart
-- Apollo MCP Server config reference: https://www.apollographql.com/docs/apollo-mcp-server/command-reference
-- Apollo MCP Server deploy docs: https://www.apollographql.com/docs/apollo-mcp-server/deploy
-- Apollo MCP Server debugging docs: https://www.apollographql.com/docs/apollo-mcp-server/debugging
+## Design decisions
+- Standalone MCP server, not Apollo Router: the demo has one plain GraphQL API and no supergraph, so the router would add GraphOS setup for nothing.
+- `introspection.introspect.enabled: true` in [mcp-config.yaml](mcp-config.yaml) adds a fourth `introspect` tool that returns schema text. That is why the tool list is 4, not 3. Turn it off there if you want strictly the allowlist.
+- The schema is a file copy ([graphql/api.graphql](graphql/api.graphql)), not introspected live; it must be edited by hand when [src/server.mjs](src/server.mjs) changes.
+- MCP image pinned to `v2.1.0`, not `latest`, so an upstream change cannot silently alter the tools.
