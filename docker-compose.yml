@@ -4,14 +4,14 @@ services:
       context: .
       dockerfile: Dockerfile.api
     ports:
-      - "4001:4001"
+      - "127.0.0.1:4001:4001"
 
   mcp:
-    image: ghcr.io/apollographql/apollo-mcp-server:latest
+    image: ghcr.io/apollographql/apollo-mcp-server:v2.1.0
     depends_on:
       - api
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./mcp-config.yaml:/config.yaml:ro
       - ./graphql:/data:ro
