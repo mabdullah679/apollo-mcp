@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: npm ci
+      - name: Generate a random per-run MCP token
+        run: |
+          t=$(openssl rand -hex 32)
+          echo "::add-mask::$t"
+          echo "MCP_AUTH_TOKEN=$t" >> "$GITHUB_ENV"
       - run: docker compose up --build -d
       - run: |
           for i in $(seq 1 30); do

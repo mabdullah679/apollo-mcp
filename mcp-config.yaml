@@ -14,6 +14,10 @@ transport:
   address: 0.0.0.0
   port: 8000
   stateful_mode: false
+  host_validation:
+    enabled: true
+    allowed_hosts:
+      - mcp:8000 # the proxy forwards with this Host; clients never reach this server directly
 server_info:
   title: "Apollo MCP Demo"
   description: "Standalone Apollo MCP Server exposing selected local GraphQL operations."
